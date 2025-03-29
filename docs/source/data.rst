@@ -284,6 +284,41 @@ processes.
    <https://github.com/pytorch/pytorch/issues/13246#issuecomment-905703662>`_
    for more details on why this occurs and example code for how to
    workaround these problems.
+   <details>
+     <summary><strong>Copy-on-Write</strong></summary>
+     <p><strong>1. Forking and Copy-on-Write (COW):</strong></p>
+     <p>When a parent process forks a child process, the operating system doesn’t immediately duplicate the parent's memory. Instead, both processes share the same physical memory pages. This efficient strategy is known as copy-on-write \ (COW).Memory pages are only copied if a process attempts to modify them.</p>
+  
+     <p><strong>Memory Pages and Reference Counts:</strong></p>
+     <ul>
+       <li>In Python, every object has an associated reference count, which tracks how many references point to that object.</li>
+       <li>Memory is managed in fixed-size blocks called pages (typically 4 KB), and each page can contain multiple objects.</li>
+     </ul>
+  
+     <p><strong>Triggering Memory Copying:</strong></p>
+     <ul>
+       <li>When a child process reads from a shared list, Python may increment the reference count of the accessed object.</li>
+       <li>This increment modifies the memory page, causing the OS to duplicate the entire page for the child process.</li>
+       <li>This leads to increased memory usage due to unintended page copying.</li>
+     </ul>
+  
+     <p><strong>Extent of Memory Copying:</strong></p>
+     <ul>
+       <li>The OS duplicates entire memory pages, not just individual objects.</li>
+       <li>If a child process accesses an object, the entire 4 KB page containing that object’s reference count is copied.</li>
+       <li>If the page includes multiple objects, all of them are duplicated in the child’s memory space.</li>
+     </ul>
+  
+     <p><strong>Summary:</strong> When a subprocess reads an element from a shared list, accessing the element can lead to the duplication of the entire memory page containing that element’s reference count. This occurs \ due to Python’s reference counting system and the OS’s copy-on-write strategy.</p>
+  
+     <p><strong>Mitigation Strategies:</strong></p>
+     <ul>
+       <li><strong>Use Immutable Data Structures:</strong> Immutable objects don’t require reference count updates, reducing the likelihood of triggering COW.</li>
+       <li><strong>Utilize Shared Memory:</strong> Python’s multiprocessing module provides shared memory capabilities to avoid unnecessary copying.</li>
+       <li><strong>Leverage Specialized Libraries:</strong> Libraries like NumPy handle large datasets efficiently and can help manage memory usage in multiprocessing scenarios.</li>
+     </ul>
+   </details>
+
 
 In this mode, each time an iterator of a :class:`~torch.utils.data.DataLoader`
 is created (e.g., when you call ``enumerate(dataloader)``), :attr:`num_workers`
